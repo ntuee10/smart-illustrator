@@ -5,13 +5,17 @@
 
 **[中文文档](README.zh-CN.md)**
 
-> **🆕 v1.4.0 — Tri-Engine System (Feb 2026)**
+> **🆕 v1.5.0 — TikZ Engine for LaTeX (Mar 2026)**
 >
-> New Excalidraw engine for hand-drawn concept diagrams. Three-tier priority: Gemini → Excalidraw → Mermaid. All diagram engines now output PNG by default. [Details →](#tri-engine-system)
+> New TikZ engine for generating beautiful LaTeX-native vector illustrations. Generate `.tex` files ready for inclusion in LaTeX documents, with optional PDF and PNG compilation. [Details →](#tikz--latex-engine)
+
+> **v1.4.0 — Tri-Engine System (Feb 2026)**
+>
+> New Excalidraw engine for hand-drawn concept diagrams. Three-tier priority: Gemini → Excalidraw → Mermaid. All diagram engines now output PNG by default. [Details →](#quad-engine-system)
 
 ![Tri-Engine Architecture](assets/dual-engine-architecture.png)
 
-Intelligent article illustration Skill for Claude Code with **tri-engine system**: automatically selects Gemini (for creative visuals), Excalidraw (for hand-drawn diagrams), or Mermaid (for structured diagrams) based on content type.
+Intelligent article illustration Skill for Claude Code with **quad-engine system**: automatically selects Gemini (for creative visuals), Excalidraw (for hand-drawn diagrams), Mermaid (for structured diagrams), or TikZ (for LaTeX-native vector illustrations) based on content type.
 
 ## Status
 
@@ -40,15 +44,16 @@ https://youtu.be/TbyJ3imLuXQ
 
 ## Features
 
-- **Tri-Engine System**: Auto-selects Gemini, Excalidraw, or Mermaid based on content type
+- **Quad-Engine System**: Auto-selects Gemini, Excalidraw, Mermaid, or TikZ based on content type
 - **Smart Position Detection**: Analyzes article structure to identify optimal illustration points
 - **10+ Illustration Types**: flowchart, sequence, mindmap, concept, comparison, scene, metaphor...
+- **TikZ / LaTeX Support**: Generate `.tex` vector illustrations for LaTeX documents, papers, and books
 - **Extensible Style System**: Light, Dark, Minimal, Cover, and custom styles
 - **Cover Mode**: Generate high-CTR YouTube thumbnails with best practices built-in
 - **Multi-Platform Sizes**: YouTube, WeChat, Twitter, Xiaohongshu presets
 - **Resume Generation**: Skip already-generated images, regenerate specific ones
 - **Brand Customizable**: Modify `styles/` to apply your brand style
-- **Multiple Backends**: Gemini API for creative visuals (2K resolution), Excalidraw for hand-drawn diagrams, Mermaid CLI for structured diagrams — all output PNG by default
+- **Multiple Backends**: Gemini API for creative visuals (2K resolution), Excalidraw for hand-drawn diagrams, Mermaid CLI for structured diagrams, TikZ for LaTeX-native vector output — all configurable via `--engine`
 
 ## What Are Skills?
 
@@ -63,6 +68,11 @@ Skills are prompt-based extensions for [Claude Code](https://docs.anthropic.com/
 - [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli) (for Mermaid diagrams): `npm install -g @mermaid-js/mermaid-cli`
 - Excalidraw export dependencies (optional, for Excalidraw diagrams): `cd ~/.claude/skills/smart-illustrator/scripts && npm install && npx playwright install firefox`
 - Gemini API Key (optional, for creative visuals): https://aistudio.google.com/apikey
+- LaTeX distribution (optional, for TikZ PDF/PNG compilation):
+  - **Ubuntu/Debian**: `sudo apt-get install texlive-latex-extra`
+  - **macOS**: `brew install --cask mactex`
+  - **Windows**: [MiKTeX](https://miktex.org/)
+- PDF-to-PNG converter (optional, for TikZ PNG export): `sudo apt-get install poppler-utils` or [ImageMagick](https://imagemagick.org/)
 
 ### Option A: Manual Installation (Recommended)
 
@@ -110,7 +120,9 @@ cp -r smart-illustrator/styles ~/.claude/skills/smart-illustrator/
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--mode` | `article` | Mode: `article`, `slides`, or `cover` |
-| `--engine` | `auto` | Engine: `auto`, `gemini`, `excalidraw`, or `mermaid` |
+| `--engine` | `auto` | Engine: `auto`, `gemini`, `excalidraw`, `mermaid`, or `tikz` |
+| `--tikz-compile` | `false` | (TikZ engine) Compile `.tex` to PDF with pdflatex/lualatex |
+| `--tikz-png` | `false` | (TikZ engine) Also convert PDF to PNG (requires `--tikz-compile`) |
 | `--mermaid-embed` | `false` | Embed Mermaid code blocks instead of exporting PNG |
 | `--platform` | `youtube` | Cover platform: `youtube`/`wechat`/`twitter`/`xiaohongshu`/`landscape`/`square` |
 | `--topic` | - | Cover topic (alternative to article path, cover mode only) |
@@ -139,6 +151,10 @@ article-cover.png             # Cover image (16:9)
 article-image-01.png          # Content illustration (3:4)
 article-image-02.png
 article-image-03.png
+article-tikz-01.tikz          # TikZ source code (--engine tikz)
+article-tikz-01.tex           # Standalone LaTeX document (--engine tikz)
+article-tikz-01.pdf           # Compiled PDF (--engine tikz --tikz-compile)
+article-tikz-01.png           # Exported PNG at 300 dpi (--engine tikz --tikz-png)
 ```
 
 ### Manual Script Usage
@@ -216,7 +232,67 @@ npx -y bun ~/.claude/skills/smart-illustrator/scripts/mermaid-export.ts \
 | `-w, --width` | Image width in pixels |
 | `-H, --height` | Image height in pixels |
 
-## PPT/Slides Generation Mode
+#### tikz-export.ts (TikZ to LaTeX / PDF / PNG)
+
+Generate beautiful LaTeX-native vector illustrations in TikZ format, ready for inclusion in LaTeX documents.
+
+```bash
+# Export TikZ code to a standalone LaTeX file
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  --input diagram.tikz \
+  --output diagram.tex
+
+# Compile to PDF (requires pdflatex or lualatex)
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  --input diagram.tikz \
+  --output diagram.pdf \
+  --compile
+
+# Compile and also export to PNG at 300 dpi (requires poppler-utils or ImageMagick)
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  --input diagram.tikz \
+  --output diagram.png \
+  --compile --png
+
+# From inline TikZ code
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  --content "\draw[->] (0,0) -- (2,0) node[right] {\$x\$};" \
+  --output axis.tex
+
+# Add extra TikZ libraries
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  --input circuit.tikz \
+  --output circuit.tex \
+  --libraries "circuits.ee.IEC,intersections"
+```
+
+| Option | Description |
+|--------|-------------|
+| `-i, --input` | Input `.tikz` file containing TikZ drawing commands |
+| `-c, --content` | Inline TikZ code (alternative to `--input`) |
+| `-o, --output` | Output path: `.tex`, `.pdf`, or `.png` |
+| `-l, --libraries` | Additional `\usetikzlibrary` entries (comma-separated) |
+| `-p, --packages` | Additional `\usepackage` entries (comma-separated) |
+| `--border` | Standalone document border in pt (default: 10) |
+| `--compile` | Compile `.tex` to PDF using `pdflatex` or `lualatex` |
+| `--png` | Also convert compiled PDF to PNG (requires `--compile`) |
+
+**Input format:** Provide raw TikZ drawing commands (without `\documentclass` or `\begin{tikzpicture}`). The script automatically wraps them in a complete standalone LaTeX document including commonly-needed packages and libraries.
+
+**Using the output in LaTeX:**
+
+```latex
+% Option 1: Input the .tex file directly (inline, scalable)
+\usepackage{tikz}
+\input{diagram.tex}
+
+% Option 2: Include compiled PDF (preferred for large documents)
+\usepackage{graphicx}
+\includegraphics[width=0.8\textwidth]{diagram.pdf}
+
+% Option 3: Include PNG raster image
+\includegraphics[width=0.8\textwidth]{diagram.png}
+```
 
 Beyond article illustrations, this skill can generate batch infographics for PPT/Keynote slides.
 
@@ -447,30 +523,135 @@ The skill analyzes article structure to identify optimal illustration points:
 
 ---
 
-## Tri-Engine System
+## Quad-Engine System
 
-The skill automatically selects the best rendering engine based on content, with three-tier priority:
+The skill automatically selects the best rendering engine based on content, with four-tier priority:
 
 | Priority | Engine | Best For | Output |
 |----------|--------|----------|--------|
 | **1** | **Gemini** | Creative visuals (metaphors, scenes, infographics) | PNG (2K) |
 | **2** | **Excalidraw** | Hand-drawn concept diagrams, comparisons, simple flows | PNG |
 | **3** | **Mermaid** | Complex structured diagrams (flowcharts, sequences, architectures) | PNG |
+| **4** | **TikZ** | LaTeX documents, academic papers, books (vector, math-ready) | .tex / PDF / PNG |
 
 **Selection logic:**
 - Needs metaphor, emotion, or creative expression → Gemini
 - Needs hand-drawn / informal style, or simple concept relationships → Excalidraw
 - Complex structured flows / architectures → Mermaid
+- User is writing a LaTeX document or explicitly requests TikZ → **TikZ**
+
+## TikZ / LaTeX Engine
+
+For users writing LaTeX documents (academic papers, books, theses, course notes), the TikZ engine generates **native LaTeX vector illustrations** that can be included directly in your `.tex` files without any additional conversion.
+
+### Why TikZ for LaTeX?
+
+| Feature | PNG/SVG | TikZ (.tex) |
+|---------|---------|------------|
+| Scalability | Limited (raster at fixed DPI) | Perfect (vector, infinitely scalable) |
+| Font matching | External fonts differ from document | Automatically matches document fonts |
+| Math in labels | Requires extra work | Native LaTeX math (e.g., `$\sqrt{x^2+y^2}$`) |
+| File size | Large (image data) | Small (plain text code) |
+| Version control | Binary diffs | Text diffs |
+| Editing | Requires image editor | Edit `.tikz` source in any text editor |
+
+### Usage Examples
+
+```bash
+# Generate TikZ illustrations for a LaTeX article
+/smart-illustrator my-paper.tex --engine tikz
+
+# Generate and compile to PDF in one step
+/smart-illustrator my-paper.tex --engine tikz --tikz-compile
+
+# Generate, compile, and export PNG for previewing
+/smart-illustrator my-paper.tex --engine tikz --tikz-png
+
+# Direct script usage: convert TikZ code to standalone LaTeX
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  --input flowchart.tikz \
+  --output flowchart.tex
+
+# Compile to PDF
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  --input flowchart.tikz \
+  --output flowchart.pdf --compile
+
+# Compile to PNG at 300 dpi
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  --input flowchart.tikz \
+  --output flowchart.png --compile --png
+```
+
+### What the Script Generates
+
+The `tikz-export.ts` script wraps your TikZ drawing code in a `standalone` LaTeX document:
+
+```latex
+\documentclass[tikz,border=10pt]{standalone}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usetikzlibrary{shapes,arrows.meta,positioning,calc,...}
+\begin{document}
+\begin{tikzpicture}
+  % Your TikZ drawing commands here
+\end{tikzpicture}
+\end{document}
+```
+
+The standalone class outputs a PDF cropped tightly around the drawing — perfect for `\input{}` or `\includegraphics{}`.
+
+### Including TikZ Output in Your LaTeX Document
+
+```latex
+\documentclass{article}
+\usepackage{tikz}
+\usepackage{graphicx}
+
+\begin{document}
+
+% Option 1: Inline the .tex file (scalable, fonts match document)
+\begin{figure}[h]
+  \centering
+  \input{diagram.tex}
+  \caption{System Architecture}
+\end{figure}
+
+% Option 2: Include the compiled PDF (clean separation of concerns)
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.8\textwidth]{diagram.pdf}
+  \caption{System Architecture}
+\end{figure}
+
+\end{document}
+```
+
+### Supported Diagram Types
+
+- **Flowcharts** and decision trees
+- **Architecture diagrams** with component boxes and connections
+- **Sequence / timing diagrams**
+- **Mindmaps** (via TikZ mindmap library)
+- **Mathematical function plots** (via pgfplots)
+- **Tree diagrams** and hierarchies
+- **Circuit diagrams** (via circuits.ee.IEC library)
+- **Custom illustrations** with any TikZ drawing primitives
+
+See `references/tikz-guide.md` for detailed templates and code examples.
+
+---
 
 ## Illustration Types
 
 | Type | Engine | Best For | Syntax/Style |
 |------|--------|----------|--------------|
-| `process` | Mermaid | Complex workflows | `flowchart` |
-| `architecture` | Mermaid | System components | `block-beta` |
-| `sequence` | Mermaid | API calls, interactions | `sequenceDiagram` |
-| `mindmap` | Mermaid | Knowledge structure | `mindmap` |
+| `process` | Mermaid / TikZ | Complex workflows | `flowchart` / TikZ flowchart |
+| `architecture` | Mermaid / TikZ | System components | `block-beta` / TikZ nodes |
+| `sequence` | Mermaid / TikZ | API calls, interactions | `sequenceDiagram` / TikZ lifelines |
+| `mindmap` | Mermaid / TikZ | Knowledge structure | `mindmap` / TikZ mindmap |
 | `state` | Mermaid | State transitions | `stateDiagram` |
+| `math-diagram` | **TikZ** | Function plots, geometry | pgfplots / TikZ coordinates |
 | `concept` | Excalidraw / Gemini | Abstract concepts | Hand-drawn / Center-radial |
 | `comparison` | Excalidraw / Gemini | A vs B, contrasts | Hand-drawn / Left-right split |
 | `data` | Gemini | Statistics, trends | Infographic style |
@@ -534,6 +715,7 @@ smart-illustrator/
 │   ├── batch-generate.ts     # Gemini batch generation (2K, resume support)
 │   ├── mermaid-export.ts     # Mermaid diagram to PNG export
 │   ├── excalidraw-export.ts  # Excalidraw diagram to PNG export
+│   ├── tikz-export.ts        # TikZ diagram to LaTeX / PDF / PNG export
 │   └── package.json          # Script dependencies (Excalidraw export)
 ├── styles/
 │   ├── brand-colors.md       # Brand palette (customizable)
@@ -544,7 +726,8 @@ smart-illustrator/
 └── references/
     ├── slides-prompt-example.json  # PPT mode JSON format example
     ├── cover-best-practices.md     # YouTube thumbnail best practices
-    └── excalidraw-guide.md         # Excalidraw JSON specification
+    ├── excalidraw-guide.md         # Excalidraw JSON specification
+    └── tikz-guide.md               # TikZ code specification for LaTeX output
 ```
 
 ## Customization
@@ -624,6 +807,26 @@ This skill follows the style guidelines from [mermaid-visualizer](https://github
 - Apply consistent color coding per layer/category
 - Use `direction LR` inside subgraphs for horizontal layouts
 
+### TikZ Engine Parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Compiler | `lualatex` (preferred) or `pdflatex` | Auto-detected from system PATH |
+| Border | `10pt` | Standalone document border (configurable via `--border`) |
+| Default libraries | shapes, arrows.meta, positioning, calc, fit, backgrounds, mindmap, trees | Included automatically |
+| PNG resolution | 300 dpi | Set by `pdftoppm -r 300` or `convert -density 300` |
+| PDF-to-PNG tool | `pdftoppm` (preferred) or `convert` | Auto-detected from system PATH |
+
+**Installation (Ubuntu/Debian):**
+```bash
+sudo apt-get install texlive-latex-extra poppler-utils
+```
+
+**Installation (macOS):**
+```bash
+brew install --cask mactex && brew install poppler
+```
+
 ### Gemini Engine Parameters
 
 | Parameter | Value | Description |
@@ -683,6 +886,7 @@ This project builds upon these excellent tools:
 - [Excalidraw](https://excalidraw.com/) - Virtual whiteboard for hand-drawn diagrams
 - [Playwright](https://playwright.dev/) - Browser automation (for Excalidraw PNG export)
 - [Gemini API](https://ai.google.dev/) - Google's image generation API
+- [TikZ/PGF](https://github.com/pgf-tikz/pgf) - LaTeX drawing package (via standalone document class)
 - [Bun](https://bun.sh/) - Fast JavaScript runtime
 
 ## License

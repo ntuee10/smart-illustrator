@@ -104,7 +104,9 @@ description: 智能配图与 PPT 信息图生成器。支持三种模式：(1) �
 | `--ref` | - | 参考图路径（可多次使用） |
 | `-c, --candidates` | `1` | 候选图数量（最多 4） |
 | `-a, --aspect-ratio` | - | 宽高比：`16:9`（正文配图/封面图默认）、`3:2`（备选横版）、`3:4`（仅竖屏平台） |
-| `--engine` | `auto` | 引擎选择：`auto`（自动）/ `mermaid` / `gemini` / `excalidraw` |
+| `--engine` | `auto` | 引擎选择：`auto`（自动）/ `mermaid` / `gemini` / `excalidraw` / `tikz` |
+| `--tikz-compile` | `false` | （仅 tikz 引擎）将 .tex 编译为 PDF（需要 pdflatex / lualatex） |
+| `--tikz-png` | `false` | （仅 tikz 引擎）同时生成 PNG（需要 `--tikz-compile` 及 poppler-utils） |
 | `--mermaid-embed` | `false` | Mermaid 输出为代码块而非 PNG（旧行为） |
 | `--save-config` | - | 保存到项目配置 |
 | `--no-config` | `false` | 禁用 config.json |
@@ -128,22 +130,26 @@ description: 智能配图与 PPT 信息图生成器。支持三种模式：(1) �
 
 ---
 
-## 三级配图引擎
+## 四级配图引擎
 
 | 优先级 | 引擎 | 适用场景 | 输出 |
 |--------|------|---------|------|
 | **1** | Gemini | 隐喻图、创意图、封面图、无法用图表表达的概念 | PNG |
 | **2** | Excalidraw | 概念图、对比图、简单流程（≤ 8 节点）、关系图、手绘风格示意图 | PNG |
 | **3** | Mermaid | **仅限**：复杂流程（> 8 节点）、多层架构图、多角色时序图、多分支决策树 | PNG |
+| **4** | TikZ | LaTeX 文档专用：需要矢量图、数学公式融合、版本控制的图形 | .tex / PDF / PNG |
 
 选择逻辑：
 - 需要隐喻、情感、创意表达 → Gemini
 - 概念关系、对比、简单流程 → Excalidraw（**大多数图表场景的首选**）
 - **只有**节点 > 8、多层/多角色的复杂结构化图形 → Mermaid
+- 用户明确要求 LaTeX 格式 / TikZ 代码 → **TikZ**
 - Mermaid 视觉表现力有限，能用 Excalidraw 就不用 Mermaid
 - 唯一目标：提高文章吸引力
 
 生成 Excalidraw 前必须读取 `references/excalidraw-guide.md`。
+
+生成 TikZ 前必须读取 `references/tikz-guide.md`。
 
 ### Mermaid 语义色板
 
@@ -185,6 +191,7 @@ class D output
 - `gemini`：强制只使用 Gemini（适合创意内容）
 - `excalidraw`：强制只使用 Excalidraw（适合手绘概念图）
 - `mermaid`：强制只使用 Mermaid（适合技术文档）
+- `tikz`：强制只使用 TikZ（适合 LaTeX 文档，输出 .tex 文件）
 
 ---
 
@@ -194,7 +201,7 @@ class D output
 
 1. 读取文章内容
 2. 识别配图位置（通常 3-5 个）
-3. 为每个位置确定引擎（Gemini / Excalidraw / Mermaid）
+3. 为每个位置确定引擎（Gemini / Excalidraw / Mermaid / TikZ）
 
 ### Step 2: 生成图片
 
@@ -228,6 +235,39 @@ npx -y bun ~/.claude/skills/smart-illustrator/scripts/excalidraw-export.ts \
 5. 保留 .excalidraw 源文件用于后续编辑
 
 依赖未安装时的降级：提示手动打开 excalidraw.com 导出。
+
+#### TikZ（LaTeX 矢量图形）→ .tex / PDF / PNG
+
+**使用条件**：用户指定 `--engine tikz` 或明确要求 LaTeX / TikZ 格式输出。
+
+1. 读取 `references/tikz-guide.md` 获取 TikZ 代码规范
+2. 生成 TikZ 代码，保存为 `.tikz` 文件（纯绘图命令，不含 `\documentclass`）
+3. 调用 tikz-export.ts 生成完整的独立 LaTeX 文档：
+
+```bash
+# 仅生成 .tex 文件（默认）
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  -i {图表名}.tikz -o {图表名}.tex
+
+# 同时编译为 PDF（需要 pdflatex/lualatex）
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  -i {图表名}.tikz -o {图表名}.pdf --compile
+
+# 同时生成 PNG（需要 --compile 及 poppler-utils/ImageMagick）
+npx -y bun ~/.claude/skills/smart-illustrator/scripts/tikz-export.ts \
+  -i {图表名}.tikz -o {图表名}.png --compile --png
+```
+
+4. 在文章中引用：
+   - LaTeX 文档：`\input{{图表名}.tex}` 或 `\includegraphics{{图表名}.pdf}`
+   - Markdown（需要 PNG）：`![{说明}]({图表名}.png)`
+5. 保留 `.tikz` 源文件用于后续编辑
+
+**编译参数传递**：
+- 用户指定 `--tikz-compile` → 传递 `--compile` 给 tikz-export.ts
+- 用户指定 `--tikz-png` → 传递 `--compile --png` 给 tikz-export.ts
+
+编译依赖未安装时的降级：仅生成 .tex 文件，告知用户手动运行 `pdflatex {图表名}.tex` 编译。
 
 #### Gemini（创意/视觉图形）
 
@@ -308,4 +348,8 @@ article.md              # 原文（不修改）
 article-image.md        # 带配图的文章
 article-cover.png       # 封面图（16:9）
 article-image-01.png    # Gemini 配图
+article-tikz-01.tikz    # TikZ 源代码（--engine tikz）
+article-tikz-01.tex     # 完整 LaTeX 文档（--engine tikz）
+article-tikz-01.pdf     # 编译后 PDF（--engine tikz --tikz-compile）
+article-tikz-01.png     # 导出 PNG（--engine tikz --tikz-png）
 ```
